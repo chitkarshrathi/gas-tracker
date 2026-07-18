@@ -1,3 +1,4 @@
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -12,12 +13,13 @@ export default function AddLogScreen() {
     const [fuel, setFuel] = useState('');
     const [price, setPrice] = useState('');
     const [fuelType, setFuelType] = useState('Regular');
-    const [logDate, setLogDate] = useState(new Date().toLocaleDateString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric'}));
+    const [date, setDate] = useState(new Date());
     const distLabel = unitSystem === 'Imperial' ? 'miles' : 'km';
     const fuelLabel = unitSystem === 'Imperial' ? 'gallons' : 'liters';
 
     const handleSave = () => {
-        addLog(parseFloat(odometer), parseFloat(fuel), parseFloat(price), fuelType, logDate);
+        const formattedDate = date.toLocaleDateString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric'});
+        addLog(parseFloat(odometer), parseFloat(fuel), parseFloat(price), fuelType, formattedDate);
         router.back();
     };
 
@@ -29,11 +31,17 @@ export default function AddLogScreen() {
                 value={odometer} onChangeText={setOdometer}
             />
 
-            <Text style={styles.label}>Date (MM/DD/YYYY):</Text>
-            <TextInput
-                style={styles.input}
-                value={logDate} onChangeText={setLogDate}
-                keyboardType="numbers-and-punctuation"
+            <Text style={styles.label}>Date:</Text>
+            <DateTimePicker
+                value={date}
+                mode="date"
+                display="compact"
+                onValueChange={(event, selectedDate) => {
+                    if (selectedDate) {
+                        setDate(selectedDate);
+                    }
+                }}
+                style={{alignSelf: 'flex-start', marginBottom: 15, marginTop: 5}}
             />
 
             <Text style={styles.label}>Fuel Added ({fuelLabel}):</Text>
