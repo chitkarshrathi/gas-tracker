@@ -17,12 +17,14 @@ export default function DashboardScreen() {
     const router = useRouter();
     const { logs, unitSystem, deleteLog } = useAppContext();
 
-    // 2. NEW SCREEN TIME STATE
+    // 2. NEW SCREEN TIME STATE & CHART STATE
     const [viewMode, setViewMode] = useState('Month'); // 'Week', 'Month', 'Year', 'All'
     const [refDate, setRefDate] = useState(new Date());
+    const [chartType, setChartType] = useState('efficiency'); // 'efficiency' or 'price'
 
     const currency = "$";
     const efficiencyLabel = unitSystem === 'Imperial' ? 'MPG' : 'km/L';
+    const unitLabel = unitSystem === 'Imperial' ? 'gal' : 'L';
 
     // 3. NAVIGATION CONTROLS
     const changePeriod = (direction: number) => {
@@ -48,7 +50,7 @@ export default function DashboardScreen() {
         }
     };
 
-    // NEW: Check if we are allowed to scroll forward (Moved outside of getPeriodLabel)
+    // Check if we are allowed to scroll forward
     const today = new Date();
     let canGoForward = false;
 
@@ -104,7 +106,7 @@ export default function DashboardScreen() {
     // 5. CALCULATE STATS
     const displaySpent = statsLogs.reduce((sum: number, log: any) => sum + Number(log.price), 0);
     
-    // NEW: Calculate total volume to find the average price
+    // Calculate total volume to find the average price
     const totalVolume = statsLogs.reduce((sum: number, log: any) => sum + Number(log.fuel), 0);
     const avgPricePerUnit = totalVolume > 0 ? (displaySpent / totalVolume) : 0;
     
@@ -120,15 +122,20 @@ export default function DashboardScreen() {
             displayEfficiency = totalDistance / totalFuel;
         }
 
-        // GENERATE CHART DATA
+        // GENERATE CHART DATA FOR EITHER MODE
         const labels = [];
         const dataPoints = [];
         for (let i = 1; i < statsLogs.length; i++) {
             const distance = Number(statsLogs[i].odometer) - Number(statsLogs[i-1].odometer);
             const currentFuel = Number(statsLogs[i].fuel);
+            const currentPrice = Number(statsLogs[i].price);
             
             if (currentFuel > 0) {
-                dataPoints.push(distance / currentFuel);
+                if (chartType === 'efficiency') {
+                    dataPoints.push(distance / currentFuel);
+                } else {
+                    dataPoints.push(currentPrice / currentFuel);
+                }
                 labels.push(`${statsLogs[i].parsedDate.getMonth() + 1}/${statsLogs[i].parsedDate.getDate()}`);
             }
         }
@@ -190,9 +197,8 @@ export default function DashboardScreen() {
                         <View style={styles.statsCard}>
                             <Text style={styles.statText}>Total Spent: {currency}{displaySpent.toFixed(2)}</Text>
                             
-                            {/* NEW STAT: Average Price Per Gallon/Liter */}
                             <Text style={styles.statText}>
-                                Avg Price: {currency}{avgPricePerUnit.toFixed(2)}/{unitSystem === 'Imperial' ? 'gal' : 'L'}
+                                Avg Price: {currency}{avgPricePerUnit.toFixed(2)}/{unitLabel}
                             </Text>
 
                             <Text style={styles.statText}>
@@ -203,19 +209,45 @@ export default function DashboardScreen() {
 
                         {showChart && (
                             <View style={styles.chartContainer}>
-                                <Text style={styles.chartTitle}>Efficiency Trend ({efficiencyLabel})</Text>
+                                
+                                {/* Apple Light Mode Segmented Control */}
+                                <View style={styles.chartToggleContainer}>
+                                    <TouchableOpacity 
+                                        style={[styles.chartToggleBtn, chartType === 'efficiency' && styles.chartToggleBtnActive]}
+                                        onPress={() => setChartType('efficiency')}
+                                    >
+                                        <Text style={[styles.chartToggleText, chartType === 'efficiency' && styles.chartToggleTextActive]}>
+                                            Efficiency
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.chartToggleBtn, chartType === 'price' && styles.chartToggleBtnActive]}
+                                        onPress={() => setChartType('price')}
+                                    >
+                                        <Text style={[styles.chartToggleText, chartType === 'price' && styles.chartToggleTextActive]}>
+                                            Price per {unitLabel}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={styles.chartTitle}>
+                                    {chartType === 'efficiency' 
+                                        ? `Efficiency Trend (${efficiencyLabel})` 
+                                        : `Price Trend (${currency}/${unitLabel})`}
+                                </Text>
+                                
                                 <LineChart
                                     data={chartData}
                                     width={Dimensions.get('window').width - 40}
                                     height={180}
-                                    yAxisLabel=""
+                                    yAxisLabel={chartType === 'price' ? currency : ""}
                                     yAxisSuffix=""
                                     yAxisInterval={1}
                                     chartConfig={{
                                         backgroundColor: '#ffffff',
                                         backgroundGradientFrom: '#ffffff',
                                         backgroundGradientTo: '#ffffff',
-                                        decimalPlaces: 1,
+                                        decimalPlaces: 2,
                                         color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
                                         labelColor: (opacity = 1) => `rgba(100, 100, 100, ${opacity})`,
                                         style: { borderRadius: 12 },
@@ -236,7 +268,7 @@ export default function DashboardScreen() {
                         <View>
                             <Text style={styles.logDate}>{item.date}</Text>
                             <Text>Odo: {item.odometer} | Cost: {currency}{item.price}</Text>
-                            <Text style={styles.fuelTypeBadge}>{item.fuelType || 'Regular'} Gas: {item.fuel} {unitSystem === 'Imperial' ? 'gal' : 'L'}</Text>
+                            <Text style={styles.fuelTypeBadge}>{item.fuelType || 'Regular'} Gas: {item.fuel} {unitLabel}</Text>
                         </View>
 
                         <TouchableOpacity onPress={() => deleteLog(item.id)} style={styles.deleteButton}>
@@ -273,6 +305,38 @@ const styles = StyleSheet.create({
     // Chart Styles
     chartContainer: { backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
     chartTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 5, color: '#333' },
+    
+    // Apple Light Mode Segmented Control
+    chartToggleContainer: { 
+        flexDirection: 'row', 
+        backgroundColor: '#E5E5EA', // Apple standard light grey
+        borderRadius: 8, 
+        padding: 3, 
+        marginBottom: 15 
+    },
+    chartToggleBtn: { 
+        flex: 1, 
+        paddingVertical: 6, 
+        alignItems: 'center', 
+        borderRadius: 6 
+    },
+    chartToggleBtnActive: { 
+        backgroundColor: '#FFFFFF', // Bright white active state
+        shadowColor: '#000', 
+        shadowOpacity: 0.12, // Softer shadow for light mode
+        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 1 }, 
+        elevation: 2 
+    },
+    chartToggleText: { 
+        fontSize: 13, 
+        color: '#666666', // Dark grey for inactive
+        fontWeight: '500' 
+    },
+    chartToggleTextActive: { 
+        color: '#000000', // Solid black for active
+        fontWeight: '600' 
+    },
 
     // List Styles
     listHeader: { fontSize: 18, fontWeight: 'bold', marginTop: 20, marginBottom: 10, color: '#333' },
