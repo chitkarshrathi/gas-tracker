@@ -55,7 +55,11 @@ export default function DashboardScreen() {
         if (viewMode === 'All') return true;
         const d = log.parsedDate;
         
-        if (viewMode === 'Year') return d.getFullYear() === refDate.getFullYear();
+        if (viewMode === 'Year') {
+            const oneYearAgo = new Date(refDate);
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+            return d >= oneYearAgo && d <= refDate;
+        }
         if (viewMode === 'Month') return d.getMonth() === refDate.getMonth() && d.getFullYear() === refDate.getFullYear();
         if (viewMode === 'Week') {
             const start = new Date(refDate);
@@ -77,6 +81,10 @@ export default function DashboardScreen() {
 
     // 5. CALCULATE STATS
     const displaySpent = statsLogs.reduce((sum: number, log: any) => sum + Number(log.price), 0);
+    
+    // NEW: Calculate total volume to find the average price
+    const totalVolume = statsLogs.reduce((sum: number, log: any) => sum + Number(log.fuel), 0);
+    const avgPricePerUnit = totalVolume > 0 ? (displaySpent / totalVolume) : 0;
     
     let displayEfficiency = 0;
     let chartData = { labels: ['Start'], datasets: [{ data: [0] }] };
@@ -151,6 +159,12 @@ export default function DashboardScreen() {
                     <View>
                         <View style={styles.statsCard}>
                             <Text style={styles.statText}>Total Spent: {currency}{displaySpent.toFixed(2)}</Text>
+                            
+                            {/* NEW STAT: Average Price Per Gallon/Liter */}
+                            <Text style={styles.statText}>
+                                Avg Price: {currency}{avgPricePerUnit.toFixed(2)}/{unitSystem === 'Imperial' ? 'gal' : 'L'}
+                            </Text>
+
                             <Text style={styles.statText}>
                                 Avg Efficiency: {displayEfficiency.toFixed(2)} {efficiencyLabel}
                             </Text>
