@@ -24,12 +24,12 @@ export function AppProvider({children}: {children: React.ReactNode}) {
 }, []);
 
 
-    const addLog = async (odometer:number, fuel: number, price: number, fuelType: string) => {
+    const addLog = async (odometer:number, fuel: number, price: number, fuelType: string, logDate: string) => {
         const date = new Date().toLocaleDateString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric'});
 
         const newLog = {
             id: Date.now().toString(),
-            date,
+            date: logDate,
             odometer,
             fuel,
             price,

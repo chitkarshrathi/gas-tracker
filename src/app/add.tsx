@@ -12,12 +12,12 @@ export default function AddLogScreen() {
     const [fuel, setFuel] = useState('');
     const [price, setPrice] = useState('');
     const [fuelType, setFuelType] = useState('Regular');
-
+    const [logDate, setLogDate] = useState(new Date().toLocaleDateString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric'}));
     const distLabel = unitSystem === 'Imperial' ? 'miles' : 'km';
     const fuelLabel = unitSystem === 'Imperial' ? 'gallons' : 'liters';
 
     const handleSave = () => {
-        addLog(parseFloat(odometer), parseFloat(fuel), parseFloat(price), fuelType);
+        addLog(parseFloat(odometer), parseFloat(fuel), parseFloat(price), fuelType, logDate);
         router.back();
     };
 
@@ -27,6 +27,13 @@ export default function AddLogScreen() {
             <TextInput
                 style={styles.input} keyboardType="numeric"
                 value={odometer} onChangeText={setOdometer}
+            />
+
+            <Text style={styles.label}>Date (MM/DD/YYYY):</Text>
+            <TextInput
+                style={styles.input}
+                value={logDate} onChangeText={setLogDate}
+                keyboardType="numbers-and-punctuation"
             />
 
             <Text style={styles.label}>Fuel Added ({fuelLabel}):</Text>
