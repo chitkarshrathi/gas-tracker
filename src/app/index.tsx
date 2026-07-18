@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Button, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -15,18 +16,21 @@ const parseDate = (dateStr: string) => {
 
 export default function DashboardScreen() {
     const router = useRouter();
-    const { logs, unitSystem, deleteLog } = useAppContext();
+    // NEW: Pulling activeVehicleId and vehicles from context
+    const { logs, unitSystem, deleteLog, activeVehicleId, vehicles } = useAppContext();
 
-    // 2. NEW SCREEN TIME STATE & CHART STATE
-    const [viewMode, setViewMode] = useState('Month'); // 'Week', 'Month', 'Year', 'All'
+    const [viewMode, setViewMode] = useState('Month'); 
     const [refDate, setRefDate] = useState(new Date());
-    const [chartType, setChartType] = useState('efficiency'); // 'efficiency' or 'price'
+    const [chartType, setChartType] = useState('efficiency'); 
 
     const currency = "$";
     const efficiencyLabel = unitSystem === 'Imperial' ? 'MPG' : 'km/L';
     const unitLabel = unitSystem === 'Imperial' ? 'gal' : 'L';
 
-    // 3. NAVIGATION CONTROLS
+    // GET ACTIVE VEHICLE DATA
+    const activeVehicle = vehicles.find(v => v.id === activeVehicleId);
+
+    // NAVIGATION CONTROLS
     const changePeriod = (direction: number) => {
         const newDate = new Date(refDate);
         if (viewMode === 'Week') newDate.setDate(newDate.getDate() + (direction * 7));
@@ -43,14 +47,13 @@ export default function DashboardScreen() {
         }
         if (viewMode === 'Week') {
             const start = new Date(refDate);
-            start.setDate(start.getDate() - start.getDay()); // Sunday
+            start.setDate(start.getDate() - start.getDay()); 
             const end = new Date(start);
-            end.setDate(end.getDate() + 6); // Saturday
+            end.setDate(end.getDate() + 6); 
             return `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`;
         }
     };
 
-    // Check if we are allowed to scroll forward
     const today = new Date();
     let canGoForward = false;
 
@@ -72,8 +75,10 @@ export default function DashboardScreen() {
         canGoForward = refStart.getTime() < todayStart.getTime();
     }
 
-    // 4. FILTER & SORT LOGIC
-    const processedLogs = logs.map((l: any) => ({ ...l, parsedDate: parseDate(l.date) }));
+    // FILTER & SORT LOGIC
+    // Step 1: Filter logs to ONLY show the active vehicle's logs
+    const vehicleLogs = logs.filter(log => log.vehicleId === activeVehicleId);
+    const processedLogs = vehicleLogs.map((l: any) => ({ ...l, parsedDate: parseDate(l.date) }));
 
     const filteredLogs = processedLogs.filter((log: any) => {
         if (viewMode === 'All') return true;
@@ -97,16 +102,11 @@ export default function DashboardScreen() {
         return true;
     });
 
-    // SORT DESCENDING FOR THE LIST (Newest Top, Oldest Bottom)
     const displayLogs = [...filteredLogs].sort((a, b) => b.parsedDate.getTime() - a.parsedDate.getTime());
-
-    // SORT ASCENDING FOR MATH & CHARTS (Chronological)
     const statsLogs = [...filteredLogs].sort((a, b) => Number(a.odometer) - Number(b.odometer));
 
-    // 5. CALCULATE STATS
+    // CALCULATE STATS
     const displaySpent = statsLogs.reduce((sum: number, log: any) => sum + Number(log.price), 0);
-    
-    // Calculate total volume to find the average price
     const totalVolume = statsLogs.reduce((sum: number, log: any) => sum + Number(log.fuel), 0);
     const avgPricePerUnit = totalVolume > 0 ? (displaySpent / totalVolume) : 0;
     
@@ -122,7 +122,6 @@ export default function DashboardScreen() {
             displayEfficiency = totalDistance / totalFuel;
         }
 
-        // GENERATE CHART DATA FOR EITHER MODE
         const labels = [];
         const dataPoints = [];
         for (let i = 1; i < statsLogs.length; i++) {
@@ -149,6 +148,24 @@ export default function DashboardScreen() {
     return (
         <View style={styles.container}>
             
+            {/* NEW: Active Vehicle Garage Selector */}
+            <TouchableOpacity 
+                style={styles.garageSelector} 
+                onPress={() => router.push('/garage' as any)}
+            >
+                <View style={styles.garageSelectorLeft}>
+                    <MaterialCommunityIcons 
+                        name={(activeVehicle?.imageUri || 'car') as any} 
+                        size={28} 
+                        color={activeVehicle?.color || '#007AFF'} 
+                    />
+                    <Text style={styles.garageSelectorText}>
+                        {activeVehicle?.makeModel || 'Select Vehicle'}
+                    </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-down" size={24} color="#666" />
+            </TouchableOpacity>
+
             {/* TOP BAR: View Mode Selector */}
             <View style={styles.filterContainer}>
                 {['Week', 'Month', 'Year', 'All'].map((mode) => (
@@ -157,7 +174,7 @@ export default function DashboardScreen() {
                         style={[styles.filterBtn, viewMode === mode && styles.filterBtnActive]}
                         onPress={() => {
                             setViewMode(mode);
-                            setRefDate(new Date()); // Reset to today when switching modes
+                            setRefDate(new Date()); 
                         }}
                     >
                         <Text style={[styles.filterText, viewMode === mode && styles.filterTextActive]}>
@@ -169,14 +186,12 @@ export default function DashboardScreen() {
 
             {/* SECOND BAR: Screen Time Paginator */}
             <View style={styles.paginator}>
-                {/* Back Arrow */}
                 <TouchableOpacity onPress={() => changePeriod(-1)} disabled={viewMode === 'All'} style={styles.pageBtn}>
                     <Text style={styles.pageArrow}>{viewMode === 'All' ? '' : '◀'}</Text>
                 </TouchableOpacity>
                 
                 <Text style={styles.pageLabel}>{getPeriodLabel()}</Text>
 
-                {/* Forward Arrow */}
                 <TouchableOpacity 
                     onPress={() => changePeriod(1)} 
                     disabled={viewMode === 'All' || !canGoForward} 
@@ -210,7 +225,6 @@ export default function DashboardScreen() {
                         {showChart && (
                             <View style={styles.chartContainer}>
                                 
-                                {/* Apple Light Mode Segmented Control */}
                                 <View style={styles.chartToggleContainer}>
                                     <TouchableOpacity 
                                         style={[styles.chartToggleBtn, chartType === 'efficiency' && styles.chartToggleBtnActive]}
@@ -285,6 +299,11 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, padding: 20, backgroundColor: '#f2f2f7', paddingTop: 50 },
     
+    // Garage Selector Header
+    garageSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+    garageSelectorLeft: { flexDirection: 'row', alignItems: 'center' },
+    garageSelectorText: { fontSize: 18, fontWeight: 'bold', color: '#333', marginLeft: 10 },
+
     // View Mode Filters
     filterContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
     filterBtn: { flex: 1, paddingVertical: 8, marginHorizontal: 4, backgroundColor: '#e5e5ea', borderRadius: 20, alignItems: 'center' },
@@ -306,37 +325,12 @@ const styles = StyleSheet.create({
     chartContainer: { backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
     chartTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 5, color: '#333' },
     
-    // Apple Light Mode Segmented Control
-    chartToggleContainer: { 
-        flexDirection: 'row', 
-        backgroundColor: '#E5E5EA', // Apple standard light grey
-        borderRadius: 8, 
-        padding: 3, 
-        marginBottom: 15 
-    },
-    chartToggleBtn: { 
-        flex: 1, 
-        paddingVertical: 6, 
-        alignItems: 'center', 
-        borderRadius: 6 
-    },
-    chartToggleBtnActive: { 
-        backgroundColor: '#FFFFFF', // Bright white active state
-        shadowColor: '#000', 
-        shadowOpacity: 0.12, // Softer shadow for light mode
-        shadowRadius: 2,
-        shadowOffset: { width: 0, height: 1 }, 
-        elevation: 2 
-    },
-    chartToggleText: { 
-        fontSize: 13, 
-        color: '#666666', // Dark grey for inactive
-        fontWeight: '500' 
-    },
-    chartToggleTextActive: { 
-        color: '#000000', // Solid black for active
-        fontWeight: '600' 
-    },
+    // Chart Toggle Switch Styles
+    chartToggleContainer: { flexDirection: 'row', backgroundColor: '#E5E5EA', borderRadius: 8, padding: 3, marginBottom: 15 },
+    chartToggleBtn: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 6 },
+    chartToggleBtnActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+    chartToggleText: { fontSize: 13, color: '#666666', fontWeight: '500' },
+    chartToggleTextActive: { color: '#000000', fontWeight: '600' },
 
     // List Styles
     listHeader: { fontSize: 18, fontWeight: 'bold', marginTop: 20, marginBottom: 10, color: '#333' },
