@@ -48,6 +48,28 @@ export default function DashboardScreen() {
         }
     };
 
+    // NEW: Check if we are allowed to scroll forward (Moved outside of getPeriodLabel)
+    const today = new Date();
+    let canGoForward = false;
+
+    if (viewMode === 'Year') {
+        canGoForward = refDate.getFullYear() < today.getFullYear();
+    } else if (viewMode === 'Month') {
+        const refMonthValue = refDate.getFullYear() * 12 + refDate.getMonth();
+        const todayMonthValue = today.getFullYear() * 12 + today.getMonth();
+        canGoForward = refMonthValue < todayMonthValue;
+    } else if (viewMode === 'Week') {
+        const refStart = new Date(refDate);
+        refStart.setDate(refStart.getDate() - refStart.getDay());
+        refStart.setHours(0, 0, 0, 0);
+        
+        const todayStart = new Date(today);
+        todayStart.setDate(todayStart.getDate() - todayStart.getDay());
+        todayStart.setHours(0, 0, 0, 0);
+        
+        canGoForward = refStart.getTime() < todayStart.getTime();
+    }
+
     // 4. FILTER & SORT LOGIC
     const processedLogs = logs.map((l: any) => ({ ...l, parsedDate: parseDate(l.date) }));
 
@@ -140,14 +162,22 @@ export default function DashboardScreen() {
 
             {/* SECOND BAR: Screen Time Paginator */}
             <View style={styles.paginator}>
+                {/* Back Arrow */}
                 <TouchableOpacity onPress={() => changePeriod(-1)} disabled={viewMode === 'All'} style={styles.pageBtn}>
                     <Text style={styles.pageArrow}>{viewMode === 'All' ? '' : '◀'}</Text>
                 </TouchableOpacity>
                 
                 <Text style={styles.pageLabel}>{getPeriodLabel()}</Text>
 
-                <TouchableOpacity onPress={() => changePeriod(1)} disabled={viewMode === 'All'} style={styles.pageBtn}>
-                    <Text style={styles.pageArrow}>{viewMode === 'All' ? '' : '▶'}</Text>
+                {/* Forward Arrow */}
+                <TouchableOpacity 
+                    onPress={() => changePeriod(1)} 
+                    disabled={viewMode === 'All' || !canGoForward} 
+                    style={styles.pageBtn}
+                >
+                    <Text style={[styles.pageArrow, (!canGoForward || viewMode === 'All') && { opacity: 0.3 }]}>
+                        {viewMode === 'All' ? '' : '▶'}
+                    </Text>
                 </TouchableOpacity>
             </View>
 
